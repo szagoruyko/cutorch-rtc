@@ -33,8 +33,12 @@ nvrtcResult nvrtcGetProgramLog(nvrtcProgram prog, char *log);
 
 nvrtc.C = ffi.load'/Developer/NVIDIA/CUDA-7.0/lib/libnvrtc.dylib'
 
-function nvrtc.errcheck(id)
-  assert(tonumber(id) == 0, tostring(id))
+nvrtc.errcheck = function(f, ...)
+   local status = nvrtc.C[f](...)
+   if status ~= 'NVRTC_SUCCESS' then
+      local str = ffi.string(nvrtc.C.nvrtcGetErrorString(status))
+      error('Error in NVRTC: ' .. str)
+   end
 end
 
 
@@ -138,6 +142,10 @@ CUresult cuCtxDestroy(CUcontext ctx);
 
 CU.C = ffi.load'/Library/Frameworks/CUDA.framework/Versions/A/CUDA'
 
-function CU.errcheck(id)
-  assert(tonumber(id) == 0, tostring(id))
+CU.errcheck = function(f, ...)
+   local status = CU.C[f](...)
+   if status ~= 'CUDA_SUCCESS' then
+      local str = ffi.string(CU.C.CUGetErrorString(status))
+      error('Error in cuda: ' .. str)
+   end
 end
