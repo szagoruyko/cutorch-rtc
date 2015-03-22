@@ -64,6 +64,5 @@ function torch.CudaTensor:apply(lambda)
 		0, nil,
 		args, nil)
 
-  CU.errcheck('cuCtxSynchronize')
   CU.errcheck('cuModuleUnload', module[0])
 end
