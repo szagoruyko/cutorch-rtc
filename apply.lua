@@ -48,11 +48,9 @@ function torch.CudaTensor:apply(lambda)
   end
 
   -- done with nvrtc, switch to Driver API
-  local context = ffi.new'CUcontext[1]'
   local module = ffi.new'CUmodule[1]'
   local func = ffi.new'CUfunction[1]'
 
-  CU.errcheck('cuCtxGetCurrent', context)
   CU.errcheck('cuModuleLoadDataEx', module, ptx, 0, nil, nil)
   CU.errcheck('cuModuleGetFunction', func, module[0], 'kernel')
 
