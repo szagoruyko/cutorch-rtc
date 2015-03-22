@@ -27,11 +27,19 @@ function torch.CudaTensor:apply(lambda)
 
     local program = ffi.new'nvrtcProgram[1]'
     nvrtc.errcheck(nvrtc.C.nvrtcCreateProgram(program, kernel, nil, 0, nil, nil))
-    nvrtc.errcheck(nvrtc.C.nvrtcCompileProgram(program[0], 0, nil))
+    local err = nvrtc.C.nvrtcCompileProgram(program[0], 0, nil)
+    if tonumber(err) == 6 then
+      local log_size = ffi.new'size_t[1]'
+      nvrtc.errcheck(nvrtc.C.nvrtcGetProgramLogSize(program[0], log_size))
+      local log = ffi.new('char[?]', tonumber(log_size[0]))
+      nvrtc.errcheck(nvrtc.C.nvrtcGetProgramLog(program[0], log))
+      print(ffi.string(log))
+    end
+    nvrtc.errcheck(err)
 
-    --local log = ffi.new'char[1]'
-    --nvrtc.errcheck(nvrtc.C.nvrtcGetProgramLog(program[0], log))
-    ptx = ffi.new'char[1]'
+    local ptx_size = ffi.new'size_t[1]'
+    nvrtc.errcheck(nvrtc.C.nvrtcGetPTXSize(program[0], ptx_size))
+    ptx = ffi.new('char[?]', tonumber(ptx_size[0]))
     nvrtc.errcheck(nvrtc.C.nvrtcGetPTX(program[0], ptx))
     ptx_cache[lambda] = ptx
   else
@@ -47,10 +55,9 @@ function torch.CudaTensor:apply(lambda)
   CU.errcheck(CU.C.cuModuleLoadDataEx(module, ptx, 0, nil, nil))
   CU.errcheck(CU.C.cuModuleGetFunction(func, module[0], 'kernel'))
 
-  local n = ffi.new('int', self:numel())
   local args = ffi.new'void*[2]'
   args[0] = ffi.new('float*[1]', self:data())
-  args[1] = ffi.new('int[1]', n)
+  args[1] = ffi.new('int[1]', self:numel())
   
   CU.errcheck(CU.C.cuLaunchKernel(func[0],
   		CUDA_NUM_THREADS, 1, 1,
