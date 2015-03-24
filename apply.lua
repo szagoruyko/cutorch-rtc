@@ -13,7 +13,7 @@ void kernel(float* a, int n)
 }
 ]]
 
-local CUDA_NUM_THREADS = 1024
+local CUDA_NUM_THREADS = 64
 
 local ptx_cache = {}
 
@@ -24,7 +24,13 @@ end
 
 function torch.CudaTensor:apply(lambda)
   local kernel = kernel_source:gsub('LAMBDA', lambda)
-  local ptx = ptx_cache[lambda] or nvrtc.compileReturnPTX(kernel)
+  local ptx
+  if not ptx_cache[lambda] then
+    ptx = nvrtc.compileReturnPTX(kernel)
+    ptx_cache[lambda] = ptx
+  else
+    ptx = ptx_cache[lambda]
+  end
 
   cutorch.launchPTX(ptx, {self, {'int', self:numel()}}, {CUDA_NUM_THREADS}, {get_blocks(self:numel())})
 end
