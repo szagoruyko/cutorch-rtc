@@ -89,15 +89,14 @@ typedef struct CUmod_st *CUmodule;
 typedef struct CUfunc_st *CUfunction;
 typedef struct CUstream_st *CUstream;
 
+CUresult cuGetErrorString(CUresult error, const char **pStr);
 CUresult cuModuleLoadDataEx(CUmodule *module, const void *image, unsigned int numOptions, CUjit_option *options, void **optionValues);
 CUresult cuModuleUnload(CUmodule hmod);
 CUresult cuModuleGetFunction(CUfunction *hfunc, CUmodule hmod, const char *name);
 CUresult cuLaunchKernel(CUfunction f, unsigned int gridDimX, unsigned int gridDimY, unsigned int gridDimZ, unsigned int blockDimX, unsigned int blockDimY, unsigned int blockDimZ, unsigned int sharedMemBytes, CUstream hStream, void **kernelParams, void **extra);
 ]]
 
-local C
---CU.C = ffi.load'/Library/Frameworks/CUDA.framework/Versions/A/CUDA'
-local ok,err = pcall(function() C = ffi.load'libcuda' end)
+local ok,err = pcall(function() CU.C = ffi.load'libcuda' end)
 if not ok then
    print(err)
    error([['libcuda.so not found in library path.
@@ -105,4 +104,4 @@ Please install CUDA version 7 or higher.
 Then make sure all the files named as libcuda.so* are placed in your library load path (for example /usr/local/lib , or manually add a path to LD_LIBRARY_PATH)
 ]])
 end
-return C
+

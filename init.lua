@@ -1,16 +1,22 @@
-require 'cutorch'
-local C = dofile 'ffi.lua'
+require 'nvrtc'
+CU = {}
+include 'ffi.lua'
+include 'apply.lua'
+
 local ffi = require 'ffi'
+local C = CU.C
 
 local errcheck = function(f, ...)
    local status = C[f](...)
    if status ~= 'CUDA_SUCCESS' then
-      local str = ffi.string(C.CUGetErrorString(status))
-      error('Error in cuda: ' .. str)
+     --TODO: handle errors properly
+     print(status)
+      --local str = ffi.string(C.CUGetErrorString(status))
+      --error('Error in cuda: ' .. str)
    end
 end
 
-function cutorch.launchPTX(ptx, arguments, blocks, threads)
+function cutorch.launchPTX(ptx, kernel_name, arguments, blocks, threads)
   assert(torch.type(blocks) == 'table' and #blocks > 0)
   assert(torch.type(threads) == 'table' and #threads > 0)
 
@@ -18,7 +24,7 @@ function cutorch.launchPTX(ptx, arguments, blocks, threads)
   local func = ffi.new'CUfunction[1]'
 
   errcheck('cuModuleLoadDataEx', module, ptx, 0, nil, nil)
-  errcheck('cuModuleGetFunction', func, module[0], 'kernel')
+  errcheck('cuModuleGetFunction', func, module[0], kernel_name)
 
   local args = ffi.new('void*[?]', #arguments)
   for i,v in ipairs(arguments) do
