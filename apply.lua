@@ -17,6 +17,7 @@ local ptx_cache = {}
 
 
 function torch.CudaTensor:apply(lambda)
+  assert(self:contiguous(), 'current version of apply only works on contiguous tensors!')
   local kernel = kernel_source..lambda..';}'
   local ptx
   if not ptx_cache[lambda] then
