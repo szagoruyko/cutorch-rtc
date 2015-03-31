@@ -5,6 +5,7 @@ void kernel(float* a, int n)
   int i = blockIdx.x * blockDim.x + threadIdx.x;
   float &x = a[i];
   if (i < n)
+    {
 ]]
 
 local CUDA_NUM_THREADS = 256
@@ -18,7 +19,7 @@ local ptx_cache = {}
 
 function torch.CudaTensor:apply(lambda)
   assert(self:contiguous(), 'current version of apply only works on contiguous tensors!')
-  local kernel = kernel_source..lambda..';}'
+  local kernel = kernel_source..lambda..';}}'
   local ptx
   if not ptx_cache[lambda] then
     ptx = nvrtc.compileReturnPTX(kernel)
