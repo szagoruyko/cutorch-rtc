@@ -16,4 +16,4 @@ require 'cutorch-rtc'
 t = torch.randn(8):cuda()
 t:apply'x = x < 0 ? 0 : x'
 ```
-That would be a simple ReLU implementation. It is possible any CUDA device function. An example is in ```apply.lua```.
+That would be a simple ReLU implementation. It is possible to use any CUDA device function inside a kernel. An example is in ```apply.lua```.
