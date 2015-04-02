@@ -10,15 +10,16 @@ local errcheck = function(f, ...)
    local status = C[f](...)
    if status ~= 'CUDA_SUCCESS' then
      --TODO: handle errors properly
-     print(status)
+     print(f, status)
       --local str = ffi.string(C.CUGetErrorString(status))
       --error('Error in cuda: ' .. str)
    end
 end
 
-function cutorch.launchPTX(ptx, kernel_name, arguments, blocks, threads)
-  assert(torch.type(blocks) == 'table' and #blocks > 0)
-  assert(torch.type(threads) == 'table' and #threads > 0)
+function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
+  assert(torch.type(gridDim) == 'table' and #gridDim > 0)
+  assert(torch.type(blockDim) == 'table' and #blockDim > 0)
+  assert(torch.Tensor(blockDim):prod() <= 1024)
 
   local module = ffi.new'CUmodule[1]'
   local func = ffi.new'CUfunction[1]'
@@ -39,8 +40,8 @@ function cutorch.launchPTX(ptx, kernel_name, arguments, blocks, threads)
   end
 
   errcheck('cuLaunchKernel', func[0],
-           threads[1], threads[2] or 1, threads[3] or 1,
-           blocks[1], blocks[2] or 1, blocks[3] or 1,
+           gridDim[1], gridDim[2] or 1, gridDim[3] or 1,
+           blockDim[1], blockDim[2] or 1, blockDim[3] or 1,
            0, nil, args, nil)
 
   errcheck('cuModuleUnload', module[0])

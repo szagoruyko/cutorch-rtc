@@ -28,6 +28,6 @@ function torch.CudaTensor:apply(lambda)
     ptx = ptx_cache[lambda]
   end
 
-  cutorch.launchPTX(ptx, 'kernel', {self, {'int', self:numel()}}, {CUDA_NUM_THREADS}, {get_blocks(self:numel())})
+  cutorch.launchPTX(ptx, 'kernel', {self, {'int', self:numel()}}, {get_blocks(self:numel())}, {CUDA_NUM_THREADS})
   return self
 end
