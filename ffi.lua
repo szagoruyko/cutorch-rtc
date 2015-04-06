@@ -126,7 +126,7 @@ bool THCudaTensor_pointwiseApply3(THCState* state,
                                   const char* op_string);
 ]]
 
-CU.APPLY_C = ffi.load './build/libcutorchrtc.so'
+CU.APPLY_C = ffi.load(package.searchpath('libcutorchrtc', package.cpath))
 
 -- copy paste from THC, could be moved to .cu
 -- stays here because there is no need to put \n\ in the end
