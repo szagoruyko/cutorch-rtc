@@ -1,10 +1,8 @@
 require 'nvrtc'
 CU = {}
 include 'ffi.lua'
-include 'apply.lua'
-
 include 'apply_ffi.lua'
-include 'new_apply.lua'
+include 'apply.lua'
 
 local ffi = require 'ffi'
 local C = CU.C

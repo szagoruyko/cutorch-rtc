@@ -1,33 +1,29 @@
-local kernel_source = [[
-extern "C" __global__
-void kernel(float* a, int n)
-{
-  int i = blockIdx.x * blockDim.x + threadIdx.x;
-  float &x = a[i];
-  if (i < n)
-    {
-]]
+function torch.CudaTensor:apply1(lambda)
+  assert(type(lambda) == 'string')
 
-local CUDA_NUM_THREADS = 256
-
-local function get_blocks(N)
-  return math.floor((N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS);
+  CU.APPLY_C.THCudaTensor_pointwiseApply1(cutorch.getState(),
+  		self:cdata(),
+		CU.APPLY_INCLUDE, lambda)
+  return self
 end
 
-local ptx_cache = {}
+function torch.CudaTensor:apply2(b, lambda)
+  assert(type(lambda) == 'string')
+  assert(torch.type(b) == 'torch.CudaTensor')
 
+  CU.APPLY_C.THCudaTensor_pointwiseApply2(cutorch.getState(),
+  		self:cdata(), b:cdata(), 
+		CU.APPLY_INCLUDE, lambda)
+  return self
+end
 
-function torch.CudaTensor:apply(lambda)
-  assert(self:contiguous(), 'current version of apply only works on contiguous tensors!')
-  local kernel = kernel_source..lambda..';}}'
-  local ptx
-  if not ptx_cache[lambda] then
-    ptx = nvrtc.compileReturnPTX(kernel)
-    ptx_cache[lambda] = ptx
-  else
-    ptx = ptx_cache[lambda]
-  end
+function torch.CudaTensor:apply3(b, c, lambda)
+  assert(type(lambda) == 'string')
+  assert(torch.type(b) == 'torch.CudaTensor')
+  assert(torch.type(c) == 'torch.CudaTensor')
 
-  cutorch.launchPTX(ptx, 'kernel', {self, {'int', self:numel()}}, {get_blocks(self:numel())}, {CUDA_NUM_THREADS})
+  CU.APPLY_C.THCudaTensor_pointwiseApply3(cutorch.getState(),
+  		self:cdata(), b:cdata(), c:cdata(),
+		CU.APPLY_INCLUDE, lambda)
   return self
 end

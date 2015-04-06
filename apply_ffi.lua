@@ -5,6 +5,19 @@ bool THCudaTensor_pointwiseApply1(THCState* state,
                                   THCudaTensor* a,
                                   const char* apply_header,
                                   const char* op_string);
+
+bool THCudaTensor_pointwiseApply2(THCState* state,
+                                  THCudaTensor* a,
+                                  THCudaTensor* b,
+                                  const char* apply_header,
+                                  const char* op_string);
+
+bool THCudaTensor_pointwiseApply3(THCState* state,
+                                  THCudaTensor* a,
+                                  THCudaTensor* b,
+                                  THCudaTensor* c,
+                                  const char* apply_header,
+                                  const char* op_string);
 ]]
 
 CU.APPLY_C = ffi.load './build/libcutorchrtc.so'

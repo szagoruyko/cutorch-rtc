@@ -7,12 +7,17 @@ FIND_PACKAGE(Torch REQUIRED)
 FIND_PACKAGE(CUDA 7.0 REQUIRED)
 
 INCLUDE_DIRECTORIES("${Torch_INSTALL_INCLUDE}/THC")
-LINK_DIRECTORIES("${Torch_INSTALL_LIB}" "/usr/local/cuda/lib64")
 
 SET(src-cuda apply.cu)
 FILE(GLOB luasrc *.lua)
 
 SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++11)
+IF(APPLE)
+  LINK_DIRECTORIES("${Torch_INSTALL_LIB}" ${CUDA_TOOLKIT_ROOT_DIR}/lib)
+ELSE()
+  LINK_DIRECTORIES("${Torch_INSTALL_LIB}" "/usr/local/cuda/lib64")
+ENDIF(APPLE)
+
 ADD_TORCH_PACKAGE(cutorch-rtc "${src}" "${luasrc}" "NVIDIA NVRTC Bindings")
 
 CUDA_ADD_LIBRARY(cutorchrtc MODULE ${src-cuda})
