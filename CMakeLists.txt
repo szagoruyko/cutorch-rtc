@@ -18,7 +18,7 @@ ELSE()
   LINK_DIRECTORIES("${Torch_INSTALL_LIB}" ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 ENDIF(APPLE)
 
-ADD_TORCH_PACKAGE(cutorch-rtc "${src}" "${luasrc}" "NVIDIA NVRTC Bindings")
+ADD_TORCH_PACKAGE(cutorch-rtc "${src}" "${luasrc}" "cutorch RTC")
 
 CUDA_ADD_LIBRARY(cutorchrtc MODULE ${src-cuda})
 TARGET_LINK_LIBRARIES(cutorchrtc luaT THC TH nvrtc cuda)
