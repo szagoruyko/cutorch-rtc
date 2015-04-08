@@ -50,12 +50,12 @@ inline void CUDA_CHECK(CUresult result)
   }
 }
 
-void run(const std::vector<char>& ptx, const char* name, void* args[], dim3 grid, dim3 block)
+void launch(const char* ptx, const char* name, void* args[], dim3 grid, dim3 block)
 {
   CUmodule module;
   CUfunction func;
 
-  CUDA_CHECK(cuModuleLoadDataEx(&module, ptx.data(), 0, NULL, NULL));
+  CUDA_CHECK(cuModuleLoadData(&module, ptx));
   CUDA_CHECK(cuModuleGetFunction(&func, module, name));
 
   CUDA_CHECK(cuLaunchKernel(func,
@@ -109,7 +109,7 @@ void THCudaTensor_pointwiseApply1RTC(
   compilePTX(src, headers, includeNames, ptx);
 
   void *args[] = {(void*)&aInfo, (void*)&totalElements};
-  run(ptx, "kernel", args, grid, block);
+  launch(ptx.data(), "kernel", args, grid, block);
 }
 
 // Example op: 'x = x*y'
@@ -159,7 +159,7 @@ void THCudaTensor_pointwiseApply2RTC(
   compilePTX(src, headers, includeNames, ptx);
 
   void *args[] = {(void*)&aInfo, (void*)&bInfo, (void*)&totalElements};
-  run(ptx, "kernel", args, grid, block);
+  launch(ptx.data(), "kernel", args, grid, block);
 }
 
 
@@ -215,7 +215,7 @@ void THCudaTensor_pointwiseApply3RTC(
   compilePTX(src, headers, includeNames, ptx);
 
   void *args[] = {(void*)&aInfo, (void*)&bInfo, (void*)&cInfo, (void*)&totalElements};
-  run(ptx, "kernel", args, grid, block);
+  launch(ptx.data(), "kernel", args, grid, block);
 }
 
 
