@@ -50,7 +50,7 @@ inline void CUDA_CHECK(CUresult result)
   }
 }
 
-void launch(const char* ptx, const char* name, void* args[], dim3 grid, dim3 block)
+void launch(const char* ptx, const char* name, void* args[], dim3 grid, dim3 block, CUstream stream)
 {
   CUmodule module;
   CUfunction func;
@@ -61,7 +61,7 @@ void launch(const char* ptx, const char* name, void* args[], dim3 grid, dim3 blo
   CUDA_CHECK(cuLaunchKernel(func,
                             grid.x, grid.y, grid.z,
                             block.x, block.y, block.z,
-                            0, 0, args, NULL));
+                            0, stream, args, NULL));
 
   CUDA_CHECK(cuModuleUnload(module));
 }
@@ -91,7 +91,8 @@ void THCudaTensor_pointwiseApply1RTC(
     const char* op,
     IndexType totalElements,
     dim3 grid, dim3 block,
-    int A)
+    int A,
+    cudaStream_t stream)
 {
   // using c++11 std::is_same here
   const char* type;
@@ -109,7 +110,7 @@ void THCudaTensor_pointwiseApply1RTC(
   compilePTX(src, headers, includeNames, ptx);
 
   void *args[] = {(void*)&aInfo, (void*)&totalElements};
-  launch(ptx.data(), "kernel", args, grid, block);
+  launch(ptx.data(), "kernel", args, grid, block, (CUstream)stream);
 }
 
 // Example op: 'x = x*y'
@@ -141,7 +142,8 @@ void THCudaTensor_pointwiseApply2RTC(
     const char* op,
     IndexType totalElements,
     dim3 grid, dim3 block,
-    int A, int B)
+    int A, int B,
+    cudaStream_t stream)
 {
   // using c++11 std::is_same here
   const char* type;
@@ -159,7 +161,7 @@ void THCudaTensor_pointwiseApply2RTC(
   compilePTX(src, headers, includeNames, ptx);
 
   void *args[] = {(void*)&aInfo, (void*)&bInfo, (void*)&totalElements};
-  launch(ptx.data(), "kernel", args, grid, block);
+  launch(ptx.data(), "kernel", args, grid, block, (CUstream)stream);
 }
 
 
@@ -197,7 +199,8 @@ void THCudaTensor_pointwiseApply3RTC(
     const char* op,
     IndexType totalElements,
     dim3 grid, dim3 block,
-    int A, int B, int C)
+    int A, int B, int C,
+    cudaStream_t stream)
 {
   // using c++11 std::is_same here
   const char* type;
@@ -215,7 +218,7 @@ void THCudaTensor_pointwiseApply3RTC(
   compilePTX(src, headers, includeNames, ptx);
 
   void *args[] = {(void*)&aInfo, (void*)&bInfo, (void*)&cInfo, (void*)&totalElements};
-  launch(ptx.data(), "kernel", args, grid, block);
+  launch(ptx.data(), "kernel", args, grid, block, (CUstream)stream);
 }
 
 
@@ -226,6 +229,7 @@ bool THCudaTensor_pointwiseApply1(THCState* state,
                                   const char* op_string)
 {
   TensorArgType aType = ReadWrite;
+  cudaStream_t stream = state->currentStream;
   long totalElements = THCudaTensor_nElement(state, a);
 
   if (THCudaTensor_nDimension(state, a) > MAX_CUTORCH_DIMS) {
@@ -270,7 +274,7 @@ bool THCudaTensor_pointwiseApply1(THCState* state,
   // dimension, and the loop to translate the linear index to the array
   // index can be similarly collapsed. That is what this unrolling is for.
 #define HANDLE_CASE(TYPE, A)                                   \
-  THCudaTensor_pointwiseApply1RTC(aInfo, apply_header, op_string, (TYPE)totalElements, grid, block, A);
+  THCudaTensor_pointwiseApply1RTC(aInfo, apply_header, op_string, (TYPE)totalElements, grid, block, A, stream);
 
 #define HANDLE_A_CASE(TYPE, A)                      \
   {                                                 \
@@ -309,9 +313,9 @@ bool THCudaTensor_pointwiseApply1(THCState* state,
     // version and the completely generic version, to reduce
     // compilation time.
     if (aInfo.isContiguous()) {
-      THCudaTensor_pointwiseApply1RTC(aInfo, apply_header, op_string, (unsigned long)totalElements, grid, block, -2);
+      THCudaTensor_pointwiseApply1RTC(aInfo, apply_header, op_string, (unsigned long)totalElements, grid, block, -2, stream);
     } else {
-      THCudaTensor_pointwiseApply1RTC(aInfo, apply_header, op_string, (unsigned long)totalElements, grid, block, -1);
+      THCudaTensor_pointwiseApply1RTC(aInfo, apply_header, op_string, (unsigned long)totalElements, grid, block, -1, stream);
     }
   }
 #undef HANDLE_CASE
@@ -334,9 +338,11 @@ bool THCudaTensor_pointwiseApply2(THCState* state,
                                   THCudaTensor* a,
                                   THCudaTensor* b,
                                   const char* apply_header,
-                                  const char* op_string) {
+                                  const char* op_string)
+{
   TensorArgType aType = ReadWrite;
   TensorArgType bType = ReadWrite;
+  cudaStream_t stream = state->currentStream;
 
   long totalElements = THCudaTensor_nElement(state, a);
 
@@ -393,7 +399,7 @@ bool THCudaTensor_pointwiseApply2(THCState* state,
   // dimension, and the loop to translate the linear index to the array
   // index can be similarly collapsed. That is what this unrolling is for.
 #define HANDLE_CASE(TYPE, A, B)                                \
-  THCudaTensor_pointwiseApply2RTC(aInfo, bInfo, apply_header, op_string, (TYPE)totalElements, grid, block, A, B);
+  THCudaTensor_pointwiseApply2RTC(aInfo, bInfo, apply_header, op_string, (TYPE)totalElements, grid, block, A, B, stream);
 
 #define HANDLE_B_CASE(TYPE, A, B)                   \
   {                                                 \
@@ -454,10 +460,10 @@ bool THCudaTensor_pointwiseApply2(THCState* state,
     // compilation time.
     if (aInfo.isContiguous() && bInfo.isContiguous()) {
       THCudaTensor_pointwiseApply2RTC(aInfo, bInfo, apply_header, op_string,
-	  			(unsigned long)totalElements, grid, block, -2, -2);
+	  			(unsigned long)totalElements, grid, block, -2, -2, stream);
     } else {
       THCudaTensor_pointwiseApply2RTC(aInfo, bInfo, apply_header, op_string,
-	  			(unsigned long)totalElements, grid, block, -1, -1);
+	  			(unsigned long)totalElements, grid, block, -1, -1, stream);
     }
   }
 #undef HANDLE_CASE
@@ -490,10 +496,12 @@ bool THCudaTensor_pointwiseApply3(THCState* state,
                                   THCudaTensor* b,
                                   THCudaTensor* c,
                                   const char* apply_header,
-                                  const char* op_string) {
+                                  const char* op_string)
+{
   TensorArgType aType = ReadWrite;
   TensorArgType bType = ReadWrite;
   TensorArgType cType = ReadWrite;
+  cudaStream_t stream = state->currentStream;
 
   long totalElements = THCudaTensor_nElement(state, a);
 
@@ -554,7 +562,7 @@ bool THCudaTensor_pointwiseApply3(THCState* state,
 #define HANDLE_CASE(TYPE, A, B, C)                                      \
   THCudaTensor_pointwiseApply3RTC(aInfo, bInfo, cInfo,			\
       apply_header, op_string, (TYPE)totalElements, grid, block,	\
-      A, B, C);								\
+      A, B, C, stream);								\
 
 #define HANDLE_C_CASE(TYPE, A, B, C)             \
   {                                              \
@@ -641,11 +649,11 @@ bool THCudaTensor_pointwiseApply3(THCState* state,
     if (aInfo.isContiguous() && bInfo.isContiguous() && cInfo.isContiguous()) {
       THCudaTensor_pointwiseApply3RTC(aInfo, bInfo, cInfo,
 	  		apply_header, op_string,
-	  		(unsigned long)totalElements, grid, block, -2, -2, -2);
+	  		(unsigned long)totalElements, grid, block, -2, -2, -2, stream);
     } else {
       THCudaTensor_pointwiseApply3RTC(aInfo, bInfo, cInfo,
 	  		apply_header, op_string,
-	  		(unsigned long)totalElements, grid, block, -1, -1, -1);
+	  		(unsigned long)totalElements, grid, block, -1, -1, -1, stream);
     }
   }
 #undef HANDLE_CASE
