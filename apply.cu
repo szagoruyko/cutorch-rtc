@@ -1,10 +1,51 @@
 #include <nvrtc.h>
 #include <vector>
+#include <unordered_map>
 #include <iostream>
 #include <type_traits>
 
 #include "THC/THC.h"
 #include "THC/THCApply.cuh"
+
+struct Apply1Hash {
+  std::string op;
+  std::string type;
+  int Adim;
+
+  Apply1Hash(std::string op, std::string type, int Adim) : op(op), type(type), Adim(Adim) {}
+
+  bool operator == (const Apply1Hash& other) const
+  {
+    return op == other.op && type == other.type && Adim == other.Adim;
+  }
+};
+
+namespace std
+{
+  template<>
+  struct hash<Apply1Hash>
+  {
+    typedef Apply1Hash argument_type;
+    typedef std::size_t result_type;
+
+    result_type operator()(argument_type const& s) const
+    {
+      result_type const h1 ( std::hash<std::string>()(s.op));
+      result_type const h2 ( std::hash<std::string>()(s.type));
+      result_type const h3 ( std::hash<int>()(s.Adim));
+      return (h1 ^ (h2 << 1)) ^ (h3 << 1);
+    }
+  };
+}
+
+typedef std::vector<char> PTX;
+typedef std::shared_ptr<PTX> PTXPtr;
+
+typedef std::unordered_map<Apply1Hash, std::shared_ptr<PTX>> Apply1Cache;
+
+
+Apply1Cache cache;
+
 
 inline void NVRTC_CHECK(nvrtcResult result)
 {
@@ -106,11 +147,20 @@ void THCudaTensor_pointwiseApply1RTC(
   const char *headers[] = {apply_header};
   const char *includeNames[] = {"header.h"};
 
-  std::vector<char> ptx;
-  compilePTX(src, headers, includeNames, ptx);
+  PTXPtr ptx;
+  Apply1Hash hash(op, type, A);
+  auto found_hash = cache.find(hash);
+  if(found_hash == cache.end())
+  {
+    ptx = PTXPtr(new PTX());
+    compilePTX(src, headers, includeNames, *ptx);
+    cache.emplace(hash, ptx);
+  }
+  else
+    ptx = found_hash->second;
 
   void *args[] = {(void*)&aInfo, (void*)&totalElements};
-  launch(ptx.data(), "kernel", args, grid, block, (CUstream)stream);
+  launch(ptx->data(), "kernel", args, grid, block, (CUstream)stream);
 }
 
 // Example op: 'x = x*y'
