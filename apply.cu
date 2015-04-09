@@ -20,6 +20,33 @@ struct Apply1Hash {
   }
 };
 
+struct Apply2Hash {
+  std::string op;
+  std::string type;
+  int Adim, Bdim;
+
+  Apply2Hash(std::string op, std::string type, int Adim, int Bdim) : op(op), type(type), Adim(Adim), Bdim(Bdim) {}
+
+  bool operator == (const Apply2Hash& other) const
+  {
+    return op == other.op && type == other.type && Adim == other.Adim && Bdim == other.Bdim;
+  }
+};
+
+struct Apply3Hash {
+  std::string op;
+  std::string type;
+  int Adim, Bdim, Cdim;
+
+  Apply3Hash(std::string op, std::string type, int Adim, int Bdim, int Cdim) :
+    op(op), type(type), Adim(Adim), Bdim(Bdim), Cdim(Cdim) {}
+
+  bool operator == (const Apply3Hash& other) const
+  {
+    return op == other.op && type == other.type && Adim == other.Adim && Bdim == other.Bdim && Cdim == other.Cdim;
+  }
+};
+
 namespace std
 {
   template<>
@@ -36,15 +63,51 @@ namespace std
       return (h1 ^ (h2 << 1)) ^ (h3 << 1);
     }
   };
+
+  template<>
+  struct hash<Apply2Hash>
+  {
+    typedef Apply2Hash argument_type;
+    typedef std::size_t result_type;
+
+    result_type operator()(argument_type const& s) const
+    {
+      result_type const h1 ( std::hash<std::string>()(s.op));
+      result_type const h2 ( std::hash<std::string>()(s.type));
+      result_type const h3 ( std::hash<int>()(s.Adim));
+      result_type const h4 ( std::hash<int>()(s.Bdim));
+      return ((h1 ^ (h2 << 1)) ^ (h3 << 1)) ^ (h4 << 1);
+    }
+  };
+
+  template<>
+  struct hash<Apply3Hash>
+  {
+    typedef Apply3Hash argument_type;
+    typedef std::size_t result_type;
+
+    result_type operator()(argument_type const& s) const
+    {
+      result_type const h1 ( std::hash<std::string>()(s.op));
+      result_type const h2 ( std::hash<std::string>()(s.type));
+      result_type const h3 ( std::hash<int>()(s.Adim));
+      result_type const h4 ( std::hash<int>()(s.Bdim));
+      result_type const h5 ( std::hash<int>()(s.Cdim));
+      return (((h1 ^ (h2 << 1)) ^ (h3 << 1)) ^ (h4 << 1)) ^ (h5 << 1);
+    }
+  };
 }
 
 typedef std::vector<char> PTX;
 typedef std::shared_ptr<PTX> PTXPtr;
 
 typedef std::unordered_map<Apply1Hash, std::shared_ptr<PTX>> Apply1Cache;
+typedef std::unordered_map<Apply2Hash, std::shared_ptr<PTX>> Apply2Cache;
+typedef std::unordered_map<Apply3Hash, std::shared_ptr<PTX>> Apply3Cache;
 
-
-Apply1Cache cache;
+Apply1Cache apply1cache;
+Apply2Cache apply2cache;
+Apply3Cache apply3cache;
 
 
 inline void NVRTC_CHECK(nvrtcResult result)
@@ -149,12 +212,12 @@ void THCudaTensor_pointwiseApply1RTC(
 
   PTXPtr ptx;
   Apply1Hash hash(op, type, A);
-  auto found_hash = cache.find(hash);
-  if(found_hash == cache.end())
+  auto found_hash = apply1cache.find(hash);
+  if(found_hash == apply1cache.end())
   {
     ptx = PTXPtr(new PTX());
     compilePTX(src, headers, includeNames, *ptx);
-    cache.emplace(hash, ptx);
+    apply1cache.emplace(hash, ptx);
   }
   else
     ptx = found_hash->second;
@@ -207,11 +270,20 @@ void THCudaTensor_pointwiseApply2RTC(
   const char *headers[] = {apply_header};
   const char *includeNames[] = {"header.h"};
 
-  std::vector<char> ptx;
-  compilePTX(src, headers, includeNames, ptx);
+  PTXPtr ptx;
+  Apply2Hash hash(op, type, A, B);
+  auto found_hash = apply2cache.find(hash);
+  if(found_hash == apply2cache.end())
+  {
+    ptx = PTXPtr(new PTX());
+    compilePTX(src, headers, includeNames, *ptx);
+    apply2cache.emplace(hash, ptx);
+  }
+  else
+    ptx = found_hash->second;
 
   void *args[] = {(void*)&aInfo, (void*)&bInfo, (void*)&totalElements};
-  launch(ptx.data(), "kernel", args, grid, block, (CUstream)stream);
+  launch(ptx->data(), "kernel", args, grid, block, (CUstream)stream);
 }
 
 
@@ -264,11 +336,20 @@ void THCudaTensor_pointwiseApply3RTC(
   const char *headers[] = {apply_header};
   const char *includeNames[] = {"header.h"};
 
-  std::vector<char> ptx;
-  compilePTX(src, headers, includeNames, ptx);
+  PTXPtr ptx;
+  Apply3Hash hash(op, type, A, B, C);
+  auto found_hash = apply3cache.find(hash);
+  if(found_hash == apply3cache.end())
+  {
+    ptx = PTXPtr(new PTX());
+    compilePTX(src, headers, includeNames, *ptx);
+    apply3cache.emplace(hash, ptx);
+  }
+  else
+    ptx = found_hash->second;
 
   void *args[] = {(void*)&aInfo, (void*)&bInfo, (void*)&cInfo, (void*)&totalElements};
-  launch(ptx.data(), "kernel", args, grid, block, (CUstream)stream);
+  launch(ptx->data(), "kernel", args, grid, block, (CUstream)stream);
 }
 
 
