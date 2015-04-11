@@ -1,5 +1,6 @@
 #include <nvrtc.h>
 #include <vector>
+#include <memory>
 #include <unordered_map>
 #include <iostream>
 #include <type_traits>
