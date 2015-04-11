@@ -41,7 +41,7 @@ Applies provided operator to a tensor:
 function CudaTensor.apply1(self, op)
 ```
 op has to be a lua string assigning a value to variable 'x'. CUDA built-in __device__ functions can be used, see CUDA documentation for more information. Multiline ops supported, has to be separated with ;
-Both contiguous and non-contiguous tensors are valid.
+Both contiguous and non-contiguous tensors are valid. First call to any apply operation takes about 0.5s, then the compiled code is cached and other calls are fast.
 
 ### apply2
 
