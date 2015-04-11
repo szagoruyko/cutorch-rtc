@@ -64,6 +64,32 @@ function rtctest.noncontig_apply3()
   mytester:asserteq(ferr, 0, 'apply3 error')
 end
 
+local function measureExecTime(foo)
+  local s = torch.tic()
+  foo()
+  cutorch.synchronize()
+  return torch.toc(s)
+end
+
+function rtctest.cachetest()
+  local a = torch.rand(32):cuda()
+  local foo = function() a:apply1'x = 2' end
+  local t1 = measureExecTime(foo)
+  local t2 = measureExecTime(foo)
+  mytester:assertgt(t1/t2, 10, 'apply1 caching')
+
+  local b = torch.rand(32):cuda()
+  local foo = function() a:apply2(b, 'x = 2*y') end
+  local t1 = measureExecTime(foo)
+  local t2 = measureExecTime(foo)
+  mytester:assertgt(t1/t2, 10, 'apply2 caching')
+
+  local c = torch.rand(32):cuda()
+  local foo = function() a:apply3(b,c, 'x = y*z') end
+  local t1 = measureExecTime(foo)
+  local t2 = measureExecTime(foo)
+  mytester:assertgt(t1/t2, 10, 'apply3 caching')
+end
 
 mytester:add(rtctest)
 mytester:run()
