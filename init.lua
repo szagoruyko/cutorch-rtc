@@ -5,16 +5,6 @@ include 'ffi.lua'
 local ffi = require 'ffi'
 local C = CU.C
 
-local errcheck = function(f, ...)
-   local status = C[f](...)
-   if status ~= 'CUDA_SUCCESS' then
-     --TODO: handle errors properly
-     print(f, status)
-      --local str = ffi.string(C.CUGetErrorString(status))
-      --error('Error in cuda: ' .. str)
-   end
-end
-
 function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
   assert(torch.type(gridDim) == 'table' and #gridDim > 0)
   assert(torch.type(blockDim) == 'table' and #blockDim > 0)
