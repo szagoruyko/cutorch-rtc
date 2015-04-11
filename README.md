@@ -18,9 +18,9 @@ t:apply1'x = x < 0 ? 0 : x'
 ```
 That would be a simple ReLU implementation.
 
-# Documentation
+## Documentation
 
-## cutorch.launchPTX
+### cutorch.launchPTX
 Runs compiled PTX.
 ```lua
 function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
@@ -34,7 +34,7 @@ Arguments:
 
 PTX can be generated in runtime with https://github.com/szagoruyko/nvrtc.torch
 
-## apply1
+### apply1
 
 Applies provided operator to a tensor:
 ```lua
@@ -43,19 +43,19 @@ function CudaTensor.apply1(self, op)
 op has to be a lua string assigning a value to variable 'x'. CUDA built-in __device__ functions can be used, see CUDA documentation for more information. Multiline ops supported, has to be separated with ;
 Both contiguous and non-contiguous tensors are valid.
 
-## apply2
+### apply2
 
 Applies provided operator using two tensors:
 ```lua
 function CudaTensor.apply2(self, a, op)
-op has to use 'x' and 'y' - self and a tensors. Can assign values to both tensors. See apply1 for properties.
 ```
+op has to use 'x' and 'y' - self and a tensors. Can assign values to both tensors. See apply1 for properties.
 
-## apply3
+### apply3
 
 Applies provided operator using three tensors:
 ```lua
 function CudaTensor.apply3(self, a, b, op)
-op has to use 'x', 'y' and 'z' - self, a and b tensors. Can assign values to all three tensors. See apply1 for properties.
 ```
+op has to use 'x', 'y' and 'z' - self, a and b tensors. Can assign values to all three tensors. See apply1 for properties.
 
