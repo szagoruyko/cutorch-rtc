@@ -5,7 +5,7 @@ Basic feature list:
  * cutorch.launchPTX function
  * apply kernels from cutorch
 
-This package brings CUDA 7 runtime compilation to Torch.
+This package brings CUDA 7 runtime compilation to Torch. Linux or OS X with C++11 compiler required.
 Installation:
 ```
 luarocks install https://raw.githubusercontent.com/szagoruyko/cutorch-rtc/master/cutorch-rtc-scm-1.rockspec
