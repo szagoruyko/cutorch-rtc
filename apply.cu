@@ -171,6 +171,13 @@ void launch(const char* ptx, const char* name, void* args[], dim3 grid, dim3 blo
   CUDA_CHECK(cuModuleUnload(module));
 }
 
+extern "C"
+void launchPTX(THCState* state, const char* ptx, const char* name, void* args[], int* grid, int* block)
+{
+  cudaStream_t stream = state->currentStream;
+  launch(ptx, name, args, dim3(grid[0], grid[1], grid[2]), dim3(block[0], block[1], block[2]), (CUstream)stream);
+}
+
 // Example op: 'x = y*2'
 const char* instanciate_apply1 = "                                      \n\
 #define TYPE %s								\n\
