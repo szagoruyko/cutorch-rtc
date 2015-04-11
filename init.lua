@@ -1,4 +1,4 @@
-require 'nvrtc'
+require 'cutorch'
 CU = {}
 include 'ffi.lua'
 

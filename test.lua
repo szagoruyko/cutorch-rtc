@@ -1,4 +1,5 @@
 require 'cutorch-rtc'
+require 'nvrtc'
 
 local mytester = torch.Tester()
 
@@ -89,6 +90,26 @@ function rtctest.cachetest()
   local t1 = measureExecTime(foo)
   local t2 = measureExecTime(foo)
   mytester:assertgt(t1/t2, 10, 'apply3 caching')
+end
+
+function rtctest.launchPTXtest()
+  local kernel = [[
+  extern "C" __global__
+  void kernel(float *a, int n)
+  {
+    int tx = blockIdx.x*blockDim.x + threadIdx.x;
+    if(tx < n)
+      a[tx] *= 2.f;
+  }
+  ]]
+
+  local ptx = nvrtc.compileReturnPTX(kernel)
+  local a = torch.randn(32):cuda()
+  local b = a:clone()
+  cutorch.launchPTX(ptx, 'kernel', {a, {'int', a:numel()}}, {1}, {32})
+
+  local err = torch.max((a - b*2):abs())
+  mytester:asserteq(err, 0, 'launchPTX err')
 end
 
 mytester:add(rtctest)
