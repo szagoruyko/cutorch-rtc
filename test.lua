@@ -1,5 +1,5 @@
 require 'cutorch-rtc'
-require 'nvrtc'
+local nvrtc = require 'nvrtc'
 
 local mytester = torch.Tester()
 
