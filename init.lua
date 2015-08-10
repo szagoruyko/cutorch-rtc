@@ -1,9 +1,6 @@
-require 'cutorch'
-CU = {}
-include 'ffi.lua'
-
 local ffi = require 'ffi'
-local C = CU.C
+local cutorch = require 'cutorch'
+local C, APPLY_INCLUDE = table.unpack(require 'cutorch-rtc/ffi')
 
 function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
   assert(torch.type(gridDim) == 'table' and #gridDim > 0)
@@ -35,7 +32,7 @@ function torch.CudaTensor:apply1(lambda)
 
   C.THCudaTensor_pointwiseApply1(cutorch.getState(),
   		self:cdata(),
-		CU.APPLY_INCLUDE, lambda)
+		APPLY_INCLUDE, lambda)
   return self
 end
 
@@ -46,7 +43,7 @@ function torch.CudaTensor:apply2(b, lambda)
 
   C.THCudaTensor_pointwiseApply2(cutorch.getState(),
   		self:cdata(), b:cdata(), 
-		CU.APPLY_INCLUDE, lambda)
+		APPLY_INCLUDE, lambda)
   return self
 end
 
@@ -58,6 +55,6 @@ function torch.CudaTensor:apply3(b, c, lambda)
 
   C.THCudaTensor_pointwiseApply3(cutorch.getState(),
   		self:cdata(), b:cdata(), c:cdata(),
-		CU.APPLY_INCLUDE, lambda)
+		APPLY_INCLUDE, lambda)
   return self
 end

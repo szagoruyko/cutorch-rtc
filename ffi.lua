@@ -1,6 +1,5 @@
 local ffi = require 'ffi'
 
-
 ffi.cdef[[
 void launchPTX(THCState* state, const char* ptx, const char* name, void* args[], int* grid, int* block);
 
@@ -23,12 +22,12 @@ bool THCudaTensor_pointwiseApply3(THCState* state,
                                   const char* op_string);
 ]]
 
-CU.C = ffi.load(package.searchpath('libcutorchrtc', package.cpath))
+local C = ffi.load(package.searchpath('libcutorchrtc', package.cpath))
 
 -- copy paste from THC, could be moved to .cu
 -- stays here because there is no need to put \n\ in the end
 -- each line
-CU.APPLY_INCLUDE = [[
+local APPLY_INCLUDE = [[
 // Maximum number of dimensions allowed for cutorch
 #define MAX_CUTORCH_DIMS 25
 
@@ -204,3 +203,5 @@ THCudaTensor_pointwiseApply3(TensorInfo<IndexType> a,
   }
 }
 ]]
+
+return {C,APPLY_INCLUDE}
