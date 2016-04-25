@@ -34,6 +34,25 @@ Arguments:
 
 PTX can be generated in runtime with https://github.com/szagoruyko/nvrtc.torch
 
+Short example:
+
+```lua
+local kernel = [[
+extern "C" __global__
+void kernel(float *a, int n)
+{
+  int tx = blockIdx.x*blockDim.x + threadIdx.x;
+  if(tx < n)
+  a[tx] *= 2.f;
+}
+]]
+
+local ptx = nvrtc.compileReturnPTX(kernel)
+local a = torch.randn(32):cuda()
+local b = a:clone()
+cutorch.launchPTX(ptx, 'kernel', {a, {'int', a:numel()}}, {1}, {32})
+```
+
 ### apply1
 
 Applies provided operator to a tensor:
