@@ -11,6 +11,8 @@ function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
   for i,v in ipairs(arguments) do
     if torch.type(v) == 'torch.CudaTensor' then
       args[i-1] = ffi.new('float*[1]', v:data())
+    elseif torch.type(v) == 'torch.CudaHalfTensor' then
+      args[i-1] = ffi.new('half*[1]', v:data())
     elseif torch.type(v) == 'table' then
       args[i-1] = ffi.new(v[1]..'[1]', v[2])
     else
@@ -26,14 +28,21 @@ function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
   C.launchPTX(cutorch.getState(), ptx, kernel_name, args, grid, block)
 end
 
+local types = {
+   'CudaTensor',
+   'CudaHalfTensor',
+   'CudaDoubleTensor',
+}
 
-function torch.CudaTensor:apply1(lambda)
-  assert(type(lambda) == 'string')
+for i,ttype in ipairs(types) do
+   torch[ttype].apply1 = function(self, lambda)
+     assert(type(lambda) == 'string')
 
-  C.THCudaTensor_pointwiseApply1(cutorch.getState(),
-  		self:cdata(),
-		APPLY_INCLUDE, lambda)
-  return self
+     C['TH'..ttype..'_pointwiseApply1'](cutorch.getState(),
+                   self:cdata(),
+                   APPLY_INCLUDE, lambda)
+     return self
+   end
 end
 
 
