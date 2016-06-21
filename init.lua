@@ -13,6 +13,14 @@ function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
       args[i-1] = ffi.new('float*[1]', v:data())
     elseif torch.type(v) == 'torch.CudaHalfTensor' then
       args[i-1] = ffi.new('half*[1]', v:data())
+    elseif torch.type(v) == 'torch.CudaDoubleTensor' then
+      args[i-1] = ffi.new('double*[1]', v:data())
+    elseif torch.type(v) == 'torch.CudaIntTensor' then
+      args[i-1] = ffi.new('int*[1]', v:data())
+    elseif torch.type(v) == 'torch.CudaByteTensor' then
+      args[i-1] = ffi.new('uint8*[1]', v:data())
+    elseif torch.type(v) == 'torch.CudaCharTensor' then
+      args[i-1] = ffi.new('int8*[1]', v:data())
     elseif torch.type(v) == 'table' then
       args[i-1] = ffi.new(v[1]..'[1]', v[2])
     else
