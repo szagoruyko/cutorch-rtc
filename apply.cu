@@ -39,10 +39,10 @@ struct ApplyHash {
 
   bool operator == (const ApplyHash& other) const
   {
-    return op == other.op &&
-           ta_type == other.ta_type &&
+    return ta_type == other.ta_type &&
            index_type == other.index_type &&
-           dim == other.dim;
+           dim == other.dim &&
+           op == other.op;
   }
 };
 
@@ -214,9 +214,9 @@ typedef %s IndexType; 							\n\
 struct Op {                                                             \n\
   __device__ __forceinline__						\n\
   void operator()(Ta* a, Tb* b, Tc *c) {            			\n\
-    float& x = *a;                                                      \n\
-    float& y = *b;							\n\
-    float& z = *c;							\n\
+    Ta& x = *a;                                                      \n\
+    Tb& y = *b;							\n\
+    Tc& z = *c;							\n\
     %s;                                                                 \n\
   }                                                                     \n\
 };                                                                      \n\

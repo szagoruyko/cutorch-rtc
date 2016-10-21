@@ -23,9 +23,11 @@ function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
       args[i-1] = ffi.new('int8*[1]', v:data())
     elseif torch.type(v) == 'table' then
       args[i-1] = ffi.new(v[1]..'[1]', v[2])
+    elseif torch.type(v) == 'cdata' then
+      args[i-1] = v
     else
       --TODO: add textures
-      error('unsupported kernel argument #'..i)
+      error('unsupported kernel argument #'..i..': '..torch.type(v))
     end
   end
 
@@ -48,30 +50,32 @@ for i,ttype in ipairs(types) do
 
      C['TH'..ttype..'_pointwiseApply1'](cutorch.getState(),
                    self:cdata(),
-                   APPLY_INCLUDE, lambda)
+                   APPLY_INCLUDE,
+                   lambda)
+     return self
+   end
+
+   torch[ttype].apply2 = function(self, b, lambda)
+     assert(type(lambda) == 'string')
+
+     C['TH'..ttype..'_pointwiseApply2'](cutorch.getState(),
+                   self:cdata(),
+                   b:cdata(),
+                   APPLY_INCLUDE,
+                   lambda)
+     return self
+   end
+
+   torch[ttype].apply3 = function(self, b, c, lambda)
+     assert(type(lambda) == 'string')
+
+     C['TH'..ttype..'_pointwiseApply3'](cutorch.getState(),
+                   self:cdata(),
+                   b:cdata(),
+                   c:cdata(),
+                   APPLY_INCLUDE,
+                   lambda)
      return self
    end
 end
 
-
-function torch.CudaTensor:apply2(b, lambda)
-  assert(type(lambda) == 'string')
-  assert(torch.type(b) == 'torch.CudaTensor')
-
-  C.THCudaTensor_pointwiseApply2(cutorch.getState(),
-  		self:cdata(), b:cdata(), 
-		APPLY_INCLUDE, lambda)
-  return self
-end
-
-
-function torch.CudaTensor:apply3(b, c, lambda)
-  assert(type(lambda) == 'string')
-  assert(torch.type(b) == 'torch.CudaTensor')
-  assert(torch.type(c) == 'torch.CudaTensor')
-
-  C.THCudaTensor_pointwiseApply3(cutorch.getState(),
-  		self:cdata(), b:cdata(), c:cdata(),
-		APPLY_INCLUDE, lambda)
-  return self
-end
