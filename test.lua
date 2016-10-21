@@ -3,21 +3,27 @@ local nvrtc = require 'nvrtc'
 
 local mytester = torch.Tester()
 
-local rtctest = {}
+local rtctest = torch.TestSuite()
+
+local function test_apply(T)
+  local a = torch.rand(32):type(T)
+  local ref_y = torch.fill(a, 9)
+  local ptx_y = a:clone():apply1'x = 9.'
+
+  local ferr = torch.max((ref_y:double() - ptx_y:double()):abs())
+  mytester:asserteq(ferr, 0, 'apply1 error')
+end
 
 function rtctest.apply1()
-  local a = torch.rand(32):cuda()
-  local ref_y = torch.sqrt(a)
-  local ptx_y = a:clone():apply1'x = sqrt(x)'
-
-  local ferr = torch.max((ref_y - ptx_y):abs())
-  mytester:asserteq(ferr, 0, 'apply1 error')
+   test_apply'torch.CudaTensor'
+   test_apply'torch.CudaDoubleTensor'
+   -- test_apply'torch.CudaHalfTensor'
 end
 
 function rtctest.noncontig_apply1()
   local a = torch.rand(32,2):cuda():select(2,1)
-  local ref_y = torch.sqrt(a)
-  local ptx_y = a:clone():apply1'x = sqrt(x)'
+  local ref_y = torch.mul(a, 9)
+  local ptx_y = a:clone():apply1'x = x * 9.'
 
   local ferr = torch.max((ref_y - ptx_y):abs())
   mytester:asserteq(ferr, 0, 'apply1 error')

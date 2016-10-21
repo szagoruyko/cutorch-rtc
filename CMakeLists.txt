@@ -8,7 +8,7 @@ FIND_PACKAGE(CUDA 7.0 REQUIRED)
 
 INCLUDE_DIRECTORIES("${Torch_INSTALL_INCLUDE}/THC")
 
-SET(src-cuda apply.cu)
+SET(src-cuda apply.cu compile_ptx.cpp)
 FILE(GLOB luasrc *.lua)
 
 SET(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -std=c++11)
