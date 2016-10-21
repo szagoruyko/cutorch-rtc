@@ -94,8 +94,8 @@ const char* instanciate_apply1 = "                                      \n\
 typedef %s Ta;                                                          \n\
 typedef %s IndexType; 							\n\
 struct Op {                                                             \n\
-  __device__ __forceinline__ void operator()(Ta* v) {                \n\
-    Ta& x = *v;                                                      \n\
+    __device__ __forceinline__ void operator()(Ta* __v) {                \n\
+    Ta& x = *__v;                                                      \n\
     %s;                                                                 \n\
   }                                                                     \n\
 };                                                                      \n\
@@ -142,32 +142,34 @@ void kernelPointwiseApply1RTC(
   launch(ptx->data(), "kernel", args, grid, block, (CUstream)stream);
 }
 
-/*
 // Example op: 'x = x*y'
 const char* instanciate_apply2 = "                                      \n\
-#define TYPE %s								\n\
 #include <header.h>                                                     \n\
+typedef %s Ta;                                                          \n\
+typedef %s Tb;                                                          \n\
+typedef %s IndexType; 							\n\
 struct Op {                                                             \n\
-  __device__ __forceinline__						\n\
-  void operator()(float* a, float* b) {      				\n\
-    float& x = *a;                                                      \n\
-    float& y = *b;							\n\
+  __device__ __forceinline__ void operator()(Ta* __a, Tb* __b) {     	\n\
+    Ta& x = *__a;                                                      \n\
+    Tb& y = *__b;							\n\
     %s;                                                                 \n\
   }                                                                     \n\
 };                                                                      \n\
 extern \"C\" __global__                                                 \n\
-void kernel(TensorInfo<TYPE> a, TensorInfo<TYPE> b, TYPE totalElements) \n\
+void kernel(TensorInfo<Ta, IndexType> a,                                \n\
+            TensorInfo<Tb, IndexType> b,                                \n\
+            IndexType totalElements)                                    \n\
 {                                                                       \n\
   Op op;                                                                \n\
-  THCudaTensor_pointwiseApply2<Op,TYPE,%d,%d>				\n\
-  			(a, b, totalElements, op);			\n\
+  kernelPointwiseApply2<Op,Ta,Tb,IndexType,%d,%d>                       \n\
+                        (a, b, totalElements, op);                      \n\
 }                                                                       \n\
 ";
 
-template <typename IndexType>
-void THCudaTensor_pointwiseApply2RTC(
-    TensorInfo<IndexType> aInfo,
-    TensorInfo<IndexType> bInfo,
+template <typename Ta, typename Tb, typename IndexType>
+void kernelPointwiseApply2RTC(
+    TensorInfo<Ta, IndexType> aInfo,
+    TensorInfo<Tb, IndexType> bInfo,
     const char* apply_header,
     const char* op,
     IndexType totalElements,
@@ -176,25 +178,23 @@ void THCudaTensor_pointwiseApply2RTC(
     cudaStream_t stream)
 {
   // using c++11 std::is_same here
-  const char* type;
-  if (std::is_same<IndexType, unsigned long>::value)
-    type = "unsigned long";
-  else if(std::is_same<IndexType, unsigned int>::value)
-    type = "unsigned int";
+  const char* index_type = getTypeString<IndexType>();
+  const char* ta_type = getTypeString<Ta>();
+  const char* tb_type = getTypeString<Tb>();
 
   char src[2048];
-  sprintf(src, instanciate_apply2, type, op, A, B);
+  sprintf(src, instanciate_apply2, ta_type, tb_type, index_type, op, A, B);
   const char *headers[] = {apply_header};
   const char *includeNames[] = {"header.h"};
 
   PTXPtr ptx;
-  Apply2Hash hash(op, type, A, B);
-  auto found_hash = apply2cache.find(hash);
-  if(found_hash == apply2cache.end())
+  ApplyHash hash(op, std::string(ta_type)+"_"+tb_type, index_type, A, B);
+  auto found_hash = applycache.find(hash);
+  if(found_hash == applycache.end())
   {
     ptx = PTXPtr(new PTX());
     compilePTX(src, headers, includeNames, *ptx);
-    apply2cache.emplace(hash, ptx);
+    applycache.emplace(hash, ptx);
   }
   else
     ptx = found_hash->second;
@@ -204,6 +204,7 @@ void THCudaTensor_pointwiseApply2RTC(
 }
 
 
+/*
 // Example op: 'x = y*z'
 const char* instanciate_apply3 = "                                      \n\
 #define TYPE %s								\n\
@@ -388,22 +389,218 @@ bool THC_pointwiseApply1(THCState* state,
 }
 
 extern "C" 
-bool THCudaTensor_pointwiseApply1(THCState* state, THCudaTensor* a, const char* apply_header, const char* op_string)
-{
+bool THCudaTensor_pointwiseApply1(THCState* state, THCudaTensor* a, const char* apply_header, const char* op_string) {
   return THC_pointwiseApply1<THCudaTensor>(state, a, apply_header, op_string);
 }
 
 extern "C" 
-bool THCudaHalfTensor_pointwiseApply1(THCState* state, THCudaHalfTensor* a, const char* apply_header, const char* op_string)
-{
+bool THCudaHalfTensor_pointwiseApply1(THCState* state, THCudaHalfTensor* a, const char* apply_header, const char* op_string) {
   return THC_pointwiseApply1<THCudaHalfTensor>(state, a, apply_header, op_string);
 }
 
 extern "C" 
-bool THCudaDoubleTensor_pointwiseApply1(THCState* state, THCudaDoubleTensor* a, const char* apply_header, const char* op_string)
-{
+bool THCudaDoubleTensor_pointwiseApply1(THCState* state, THCudaDoubleTensor* a, const char* apply_header, const char* op_string) {
   return THC_pointwiseApply1<THCudaDoubleTensor>(state, a, apply_header, op_string);
 }
+
+
+template <typename TensorTypeA,
+          typename TensorTypeB>
+bool THC_pointwiseApply2(THCState* state,
+                         TensorTypeA* a,
+                         TensorTypeB* b,
+                         const char* apply_header,
+                         const char* op_string) {
+  TensorArgType aType = ReadWrite;
+  TensorArgType bType = ReadWrite;
+  cudaStream_t stream = state->currentStream;
+  long totalElements = TensorUtils<TensorTypeA>::getNumElements(state, a);
+
+  if (totalElements != TensorUtils<TensorTypeB>::getNumElements(state, b)) {
+    return false;
+  }
+
+  if (TensorUtils<TensorTypeA>::getDims(state, a) > MAX_CUTORCH_DIMS ||
+      TensorUtils<TensorTypeB>::getDims(state, b) > MAX_CUTORCH_DIMS) {
+    return false;
+  }
+
+  if (TensorUtils<TensorTypeA>::getDims(state, a) == 0) {
+    // Zero-dim tensor; do nothing
+    return true;
+  }
+
+  const dim3 block = getApplyBlock();
+
+  dim3 grid;
+  if (!getApplyGrid(state, totalElements, grid)) {
+    return false;
+  }
+
+  // If tensor args have overlapping indices and are read/write, then
+  // we must expand the tensor to a contiguous form first, since
+  // otherwise there are conflicting writes. Upon copying back to the
+  // non-contiguous form, there will be conflicting writes, but at
+  // least with copy, one of the updaters will win atomically. This is
+  // a sketchy property of the old system as well (writing into all
+  // indices of a tensor with overlapping indices should probably be
+  // an error, since it is unclear which one should win), but we will
+  // preserve this last-writer-wins (in arbitrary copy order) behavior.
+  TensorTypeA* oldA = NULL;
+  TensorTypeB* oldB = NULL;
+
+  if (aType == ReadWrite &&
+      TensorUtils<TensorTypeA>::overlappingIndices(state, a)) {
+    // Must perform in contiguous space
+    oldA = a;
+    a = TensorUtils<TensorTypeA>::newContiguous(state, a);
+  }
+  if (bType == ReadWrite &&
+      TensorUtils<TensorTypeB>::overlappingIndices(state, b)) {
+    // Must perform in contiguous space
+    oldB = b;
+    b = TensorUtils<TensorTypeB>::newContiguous(state, b);
+  }
+
+  // It is possible that the tensor dimensions are able to be collapsed,
+  // and thus we can reduce the actual code complexity of the copy by
+  // exploiting this knowledge statically, since the div/mod is the
+  // most expensive part of the operation, more so than memory accesses.
+  // For instance, when copying a non-contiguous to a contiguous tensor
+  // (or vice versa), the contiguous tensor can be collapsed to one
+  // dimension, and the loop to translate the linear index to the array
+  // index can be similarly collapsed. That is what this unrolling is for.
+#define HANDLE_CASE(TYPE, A, B)                                         \
+  kernelPointwiseApply2RTC<typename TensorUtils<TensorTypeA>::DataType, \
+                           typename TensorUtils<TensorTypeB>::DataType, \
+                           TYPE>                                        \
+      (aInfo, bInfo, apply_header, op_string, (TYPE) totalElements, grid, block, A, B, stream);
+
+#define HANDLE_B_CASE(TYPE, A, B)               \
+  {                                             \
+    if (bInfo.isContiguous()) {                 \
+      HANDLE_CASE(TYPE, A, -2);                 \
+    } else {                                    \
+      switch (B) {                              \
+        case 1:                                 \
+        HANDLE_CASE(TYPE, A, 1);                \
+        break;                                  \
+        case 2:                                 \
+        HANDLE_CASE(TYPE, A, 2);                \
+        break;                                  \
+        default:                                \
+        HANDLE_CASE(TYPE, A, -1);               \
+        break;                                  \
+      }                                         \
+    }                                           \
+  }
+
+#define HANDLE_A_CASE(TYPE, A, B)               \
+  {                                             \
+    if (aInfo.isContiguous()) {                 \
+      HANDLE_B_CASE(TYPE, -2, B);               \
+    } else {                                    \
+      switch (A) {                              \
+        case 1:                                 \
+        HANDLE_B_CASE(TYPE, 1, B);              \
+        break;                                  \
+        case 2:                                 \
+        HANDLE_B_CASE(TYPE, 2, B);              \
+        break;                                  \
+        default:                                \
+        HANDLE_B_CASE(TYPE, -1, B);             \
+        break;                                  \
+      }                                         \
+    }                                           \
+  }
+
+  if (TensorUtils<TensorTypeA>::canUse32BitIndexMath(state, a) &&
+      TensorUtils<TensorTypeB>::canUse32BitIndexMath(state, b)) {
+    TensorInfo<typename TensorUtils<TensorTypeA>::DataType, unsigned int> aInfo =
+      getTensorInfo<TensorTypeA, unsigned int>(state, a);
+    aInfo.collapseDims();
+
+    TensorInfo<typename TensorUtils<TensorTypeB>::DataType, unsigned int> bInfo =
+      getTensorInfo<TensorTypeB, unsigned int>(state, b);
+    bInfo.collapseDims();
+
+    HANDLE_A_CASE(unsigned int, aInfo.dims, bInfo.dims);
+  } else {
+    TensorInfo<typename TensorUtils<TensorTypeA>::DataType, unsigned long> aInfo =
+      getTensorInfo<TensorTypeA, unsigned long>(state, a);
+    aInfo.collapseDims();
+
+    TensorInfo<typename TensorUtils<TensorTypeB>::DataType, unsigned long> bInfo =
+      getTensorInfo<TensorTypeB, unsigned long>(state, b);
+    bInfo.collapseDims();
+
+    // For large tensors, we only compile the completely contiguous
+    // version and the completely generic version, to reduce
+    // compilation time.
+    if (aInfo.isContiguous() && bInfo.isContiguous()) {
+      kernelPointwiseApply2RTC<typename TensorUtils<TensorTypeA>::DataType,
+                               typename TensorUtils<TensorTypeB>::DataType,
+                               unsigned long>
+        (aInfo, bInfo, apply_header, op_string, totalElements, grid, block, -2, -2, stream);
+    } else {
+      kernelPointwiseApply2RTC<typename TensorUtils<TensorTypeA>::DataType,
+                               typename TensorUtils<TensorTypeB>::DataType,
+                               unsigned long>
+        (aInfo, bInfo, apply_header, op_string, (unsigned long) totalElements, grid, block, -1, -1, stream);
+    }
+  }
+#undef HANDLE_CASE
+#undef HANDLE_B_CASE
+#undef HANDLE_A_CASE
+
+  if (oldA) {
+    // Ignore overlaps when copying back; if we use THCTensor_copy
+    // instead, it will recursively try and invoke ourselves to make
+    // oldA contiguous.
+    TensorUtils<TensorTypeA>::copyIgnoringOverlaps(state, oldA, a);
+    TensorUtils<TensorTypeA>::free(state, a);
+    a = oldA;
+  }
+
+  if (oldB) {
+    // Ignore overlaps when copying back; if we use THCTensor_copy
+    // instead, it will recursively try and invoke ourselves to make
+    // oldB contiguous.
+    TensorUtils<TensorTypeB>::copyIgnoringOverlaps(state, oldB, b);
+    TensorUtils<TensorTypeB>::free(state, b);
+    b = oldB;
+  }
+
+  return true;
+}
+
+extern "C" 
+bool THCudaTensor_pointwiseApply2(THCState* state,
+                                  THCudaTensor* a,
+                                  THCudaTensor* b,
+                                  const char* apply_header,
+                                  const char* op_string) {
+  return THC_pointwiseApply2<THCudaTensor>(state, a, b, apply_header, op_string);
+}
+
+extern "C" 
+bool THCudaHalfTensor_pointwiseApply2(THCState* state,
+                                      THCudaHalfTensor* a,
+                                      THCudaHalfTensor* b,
+                                      const char* apply_header,
+                                      const char* op_string) {
+  return THC_pointwiseApply2<THCudaHalfTensor>(state, a, b, apply_header, op_string);
+}
+
+extern "C" 
+bool THCudaDoubleTensor_pointwiseApply2(THCState* state,
+                                        THCudaDoubleTensor* a,
+                                        THCudaDoubleTensor* b,
+                                        const char* apply_header,
+                                        const char* op_string) {
+  return THC_pointwiseApply2<THCudaDoubleTensor>(state, a, b, apply_header, op_string);
+}
+
 
 /*
 extern "C" 
