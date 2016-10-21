@@ -20,7 +20,6 @@ function rtctest.apply1()
    -- test_apply'torch.CudaHalfTensor'
 end
 
---[[
 function rtctest.noncontig_apply1()
   local a = torch.rand(32,2):cuda():select(2,1)
   local ref_y = torch.mul(a, 9)
@@ -71,7 +70,6 @@ function rtctest.noncontig_apply3()
   local ferr = torch.max((ref_y - ptx_y):abs())
   mytester:asserteq(ferr, 0, 'apply3 error')
 end
-]]
 
 local function measureExecTime(foo)
   local s = torch.tic()
