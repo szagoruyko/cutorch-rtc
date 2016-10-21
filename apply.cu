@@ -10,61 +10,48 @@
 
 #include "compile_ptx.h"
 
-struct Apply1Hash {
+struct ApplyHash {
   std::string op;
   std::string index_type;
   std::string ta_type;
-  int Adim;
+  int dim;
 
-  Apply1Hash(std::string op, std::string ta_type, std::string index_type, int Adim) :
+  ApplyHash(std::string op, std::string ta_type, std::string index_type, int Adim) :
     op(op),
     ta_type(ta_type),
     index_type(index_type),
-    Adim(Adim)
+    dim(Adim)
   {}
 
-  bool operator == (const Apply1Hash& other) const
+  ApplyHash(std::string op, std::string ta_type, std::string index_type, int Adim, int Bdim) :
+    op(op),
+    ta_type(ta_type),
+    index_type(index_type),
+    dim(Adim + 64 * Bdim)
+  {}
+
+  ApplyHash(std::string op, std::string ta_type, std::string index_type, int Adim, int Bdim, int Cdim) :
+    op(op),
+    ta_type(ta_type),
+    index_type(index_type),
+    dim(Adim + 64 * Bdim + 64 * 64 * Cdim)
+  {}
+
+  bool operator == (const ApplyHash& other) const
   {
     return op == other.op &&
            ta_type == other.ta_type &&
            index_type == other.index_type &&
-           Adim == other.Adim;
-  }
-};
-
-struct Apply2Hash {
-  std::string op;
-  std::string type;
-  int Adim, Bdim;
-
-  Apply2Hash(std::string op, std::string type, int Adim, int Bdim) : op(op), type(type), Adim(Adim), Bdim(Bdim) {}
-
-  bool operator == (const Apply2Hash& other) const
-  {
-    return op == other.op && type == other.type && Adim == other.Adim && Bdim == other.Bdim;
-  }
-};
-
-struct Apply3Hash {
-  std::string op;
-  std::string type;
-  int Adim, Bdim, Cdim;
-
-  Apply3Hash(std::string op, std::string type, int Adim, int Bdim, int Cdim) :
-    op(op), type(type), Adim(Adim), Bdim(Bdim), Cdim(Cdim) {}
-
-  bool operator == (const Apply3Hash& other) const
-  {
-    return op == other.op && type == other.type && Adim == other.Adim && Bdim == other.Bdim && Cdim == other.Cdim;
+           dim == other.dim;
   }
 };
 
 namespace std
 {
   template<>
-  struct hash<Apply1Hash>
+  struct hash<ApplyHash>
   {
-    typedef Apply1Hash argument_type;
+    typedef ApplyHash argument_type;
     typedef std::size_t result_type;
 
     result_type operator()(argument_type const& s) const
@@ -72,41 +59,8 @@ namespace std
       result_type const h1 ( std::hash<std::string>()(s.op));
       result_type const h2 ( std::hash<std::string>()(s.ta_type));
       result_type const h3 ( std::hash<std::string>()(s.index_type));
-      result_type const h4 ( std::hash<int>()(s.Adim));
+      result_type const h4 ( std::hash<int>()(s.dim));
       return ((h1 ^ (h2 << 1)) ^ (h3 << 1)) ^ (h4 << 1);
-    }
-  };
-
-  template<>
-  struct hash<Apply2Hash>
-  {
-    typedef Apply2Hash argument_type;
-    typedef std::size_t result_type;
-
-    result_type operator()(argument_type const& s) const
-    {
-      result_type const h1 ( std::hash<std::string>()(s.op));
-      result_type const h2 ( std::hash<std::string>()(s.type));
-      result_type const h3 ( std::hash<int>()(s.Adim));
-      result_type const h4 ( std::hash<int>()(s.Bdim));
-      return ((h1 ^ (h2 << 1)) ^ (h3 << 1)) ^ (h4 << 1);
-    }
-  };
-
-  template<>
-  struct hash<Apply3Hash>
-  {
-    typedef Apply3Hash argument_type;
-    typedef std::size_t result_type;
-
-    result_type operator()(argument_type const& s) const
-    {
-      result_type const h1 ( std::hash<std::string>()(s.op));
-      result_type const h2 ( std::hash<std::string>()(s.type));
-      result_type const h3 ( std::hash<int>()(s.Adim));
-      result_type const h4 ( std::hash<int>()(s.Bdim));
-      result_type const h5 ( std::hash<int>()(s.Cdim));
-      return (((h1 ^ (h2 << 1)) ^ (h3 << 1)) ^ (h4 << 1)) ^ (h5 << 1);
     }
   };
 }
@@ -114,13 +68,9 @@ namespace std
 typedef std::vector<char> PTX;
 typedef std::shared_ptr<PTX> PTXPtr;
 
-typedef std::unordered_map<Apply1Hash, std::shared_ptr<PTX>> Apply1Cache;
-typedef std::unordered_map<Apply2Hash, std::shared_ptr<PTX>> Apply2Cache;
-typedef std::unordered_map<Apply3Hash, std::shared_ptr<PTX>> Apply3Cache;
+typedef std::unordered_map<ApplyHash, std::shared_ptr<PTX>> ApplyCache;
 
-Apply1Cache apply1cache;
-Apply2Cache apply2cache;
-Apply3Cache apply3cache;
+ApplyCache applycache;
 
 template <class T>
 const char* getTypeString()
@@ -177,13 +127,13 @@ void kernelPointwiseApply1RTC(
   const char *includeNames[] = {"header.h"};
 
   PTXPtr ptx;
-  Apply1Hash hash(op, ta_type, index_type, A);
-  auto found_hash = apply1cache.find(hash);
-  if(found_hash == apply1cache.end())
+  ApplyHash hash(op, ta_type, index_type, A);
+  auto found_hash = applycache.find(hash);
+  if(found_hash == applycache.end())
   {
     ptx = PTXPtr(new PTX());
     compilePTX(src, headers, includeNames, *ptx);
-    apply1cache.emplace(hash, ptx);
+    applycache.emplace(hash, ptx);
   }
   else
     ptx = found_hash->second;
