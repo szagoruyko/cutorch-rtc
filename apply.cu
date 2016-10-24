@@ -279,7 +279,7 @@ bool THC_pointwiseApply1(THCState* state,
                          const char* op_string)
 {
   TensorArgType aType = ReadWrite;
-  cudaStream_t stream = state->currentStream;
+  auto stream = THCState_getCurrentStream(state);
   if (TensorUtils<TensorTypeA>::getDims(state, a) > MAX_CUTORCH_DIMS) {
     return false;
   }
@@ -412,7 +412,7 @@ bool THC_pointwiseApply2(THCState* state,
                          const char* op_string) {
   TensorArgType aType = ReadWrite;
   TensorArgType bType = ReadWrite;
-  cudaStream_t stream = state->currentStream;
+  auto stream = THCState_getCurrentStream(state);
   long totalElements = TensorUtils<TensorTypeA>::getNumElements(state, a);
 
   if (totalElements != TensorUtils<TensorTypeB>::getNumElements(state, b)) {
@@ -600,7 +600,7 @@ bool THC_pointwiseApply3(THCState* state,
   TensorArgType aType = ReadWrite;
   TensorArgType bType = ReadWrite;
   TensorArgType cType = ReadWrite;
-  cudaStream_t stream = state->currentStream;
+  auto stream = THCState_getCurrentStream(state);
   long totalElements = TensorUtils<TensorTypeA>::getNumElements(state, a);
 
   if (totalElements != TensorUtils<TensorTypeB>::getNumElements(state, b) ||
