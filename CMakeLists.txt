@@ -18,6 +18,8 @@ ELSE()
   LINK_DIRECTORIES("${Torch_INSTALL_LIB}" ${CUDA_TOOLKIT_ROOT_DIR}/lib64)
 ENDIF(APPLE)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_FORCE_INLINES")
+
 ADD_TORCH_PACKAGE(cutorch-rtc "${src}" "${luasrc}" "cutorch RTC")
 
 CUDA_ADD_LIBRARY(cutorchrtc MODULE ${src-cuda})

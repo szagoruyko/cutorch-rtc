@@ -9,6 +9,7 @@
 #include "THC/THCApply.cuh"
 
 #include "compile_ptx.h"
+#include "apply.h"
 
 struct ApplyHash {
   std::string op;
@@ -90,7 +91,7 @@ const char* getTypeString()
 
 // Example op: 'x = y*2'
 const char* instanciate_apply1 = "                                      \n\
-#include <header.h>                                                     \n\
+#include <%s>                                                     \n\
 typedef %s Ta;                                                          \n\
 typedef %s IndexType; 							\n\
 struct Op {                                                             \n\
@@ -110,7 +111,6 @@ void kernel(TensorInfo<Ta, IndexType> a, IndexType totalElements)       \n\
 template <typename Ta, typename IndexType>
 void kernelPointwiseApply1RTC(
     TensorInfo<Ta, IndexType> aInfo,
-    const char* apply_header,
     const char* op,
     IndexType totalElements,
     dim3 grid, dim3 block,
@@ -122,9 +122,9 @@ void kernelPointwiseApply1RTC(
   const char* ta_type = getTypeString<Ta>();
 
   char src[2048];
-  sprintf(src, instanciate_apply1, ta_type, index_type, op, A);
-  const char *headers[] = {apply_header};
-  const char *includeNames[] = {"header.h"};
+  const char *headers[] = {THCApplyRTC_cuh};
+  const char *includeNames[] = {"THCApplyRTC.cuh"};
+  sprintf(src, instanciate_apply1, includeNames[0], ta_type, index_type, op, A);
 
   PTXPtr ptx;
   ApplyHash hash(op, ta_type, index_type, A);
@@ -144,7 +144,7 @@ void kernelPointwiseApply1RTC(
 
 // Example op: 'x = x*y'
 const char* instanciate_apply2 = "                                      \n\
-#include <header.h>                                                     \n\
+#include <%s>                                                           \n\
 typedef %s Ta;                                                          \n\
 typedef %s Tb;                                                          \n\
 typedef %s IndexType; 							\n\
@@ -170,7 +170,6 @@ template <typename Ta, typename Tb, typename IndexType>
 void kernelPointwiseApply2RTC(
     TensorInfo<Ta, IndexType> aInfo,
     TensorInfo<Tb, IndexType> bInfo,
-    const char* apply_header,
     const char* op,
     IndexType totalElements,
     dim3 grid, dim3 block,
@@ -183,9 +182,9 @@ void kernelPointwiseApply2RTC(
   const char* tb_type = getTypeString<Tb>();
 
   char src[2048];
-  sprintf(src, instanciate_apply2, ta_type, tb_type, index_type, op, A, B);
-  const char *headers[] = {apply_header};
-  const char *includeNames[] = {"header.h"};
+  const char *headers[] = {THCApplyRTC_cuh};
+  const char *includeNames[] = {"THCApplyRTC.cuh"};
+  sprintf(src, instanciate_apply2, includeNames[0], ta_type, tb_type, index_type, op, A, B);
 
   PTXPtr ptx;
   ApplyHash hash(op, std::string(ta_type)+"_"+tb_type, index_type, A, B);
@@ -206,7 +205,7 @@ void kernelPointwiseApply2RTC(
 
 // Example op: 'x = y*z'
 const char* instanciate_apply3 = "                                      \n\
-#include <header.h>                                                     \n\
+#include <%s>                                                           \n\
 typedef %s Ta;                                                          \n\
 typedef %s Tb;                                                          \n\
 typedef %s Tc;                                                          \n\
@@ -237,7 +236,6 @@ void kernelPointwiseApply3RTC(
     TensorInfo<Ta, IndexType> aInfo,
     TensorInfo<Tb, IndexType> bInfo,
     TensorInfo<Tc, IndexType> cInfo,
-    const char* apply_header,
     const char* op,
     IndexType totalElements,
     dim3 grid, dim3 block,
@@ -251,9 +249,9 @@ void kernelPointwiseApply3RTC(
   const char* tc_type = getTypeString<Tc>();
 
   char src[4096];
-  sprintf(src, instanciate_apply3, ta_type, tb_type, tc_type, index_type, op, A, B, C);
-  const char *headers[] = {apply_header};
-  const char *includeNames[] = {"header.h"};
+  const char *headers[] = {THCApplyRTC_cuh};
+  const char *includeNames[] = {"THCApplyRTC.cuh"};
+  sprintf(src, instanciate_apply3, includeNames[0], ta_type, tb_type, tc_type, index_type, op, A, B, C);
 
   PTXPtr ptx;
   ApplyHash hash(op, std::string(ta_type)+"_"+tb_type+"_"+tc_type, index_type, A, B, C);
@@ -275,7 +273,6 @@ void kernelPointwiseApply3RTC(
 template <typename TensorTypeA>
 bool THC_pointwiseApply1(THCState* state,
                          TensorTypeA* a,
-                         const char* apply_header,
                          const char* op_string)
 {
   TensorArgType aType = ReadWrite;
@@ -326,7 +323,7 @@ bool THC_pointwiseApply1(THCState* state,
   // index can be similarly collapsed. That is what this unrolling is for.
 #define HANDLE_CASE(TYPE, A)                                            \
   kernelPointwiseApply1RTC<typename TensorUtils<TensorTypeA>::DataType, TYPE> \
-      (aInfo, apply_header, op_string, (TYPE) totalElements, grid, block, A, stream);
+      (aInfo, op_string, (TYPE) totalElements, grid, block, A, stream);
 
 #define HANDLE_A_CASE(TYPE, A)                  \
   {                                             \
@@ -367,10 +364,10 @@ bool THC_pointwiseApply1(THCState* state,
     // compilation time.
     if (aInfo.isContiguous()) {
       kernelPointwiseApply1RTC<typename TensorUtils<TensorTypeA>::DataType, unsigned long>
-        (aInfo, apply_header, op_string, totalElements, grid, block, -2, stream);
+        (aInfo, op_string, totalElements, grid, block, -2, stream);
     } else {
       kernelPointwiseApply1RTC<typename TensorUtils<TensorTypeA>::DataType, unsigned long>
-        (aInfo, apply_header, op_string, totalElements, grid, block, -1, stream);
+        (aInfo, op_string, totalElements, grid, block, -1, stream);
     }
   }
 #undef HANDLE_CASE
@@ -393,9 +390,8 @@ bool THC_pointwiseApply1(THCState* state,
   extern "C" \
   bool TH_CONCAT_2(TYPE, _pointwiseApply1)(THCState* state, \
                                     TYPE* a, \
-                                    const char* apply_header, \
                                     const char* op_string) { \
-    return THC_pointwiseApply1<TYPE>(state, a, apply_header, op_string); \
+    return THC_pointwiseApply1<TYPE>(state, a, op_string); \
   }
 
 THC_POINTWISE_APPLY1(THCudaTensor)
@@ -408,7 +404,6 @@ template <typename TensorTypeA,
 bool THC_pointwiseApply2(THCState* state,
                          TensorTypeA* a,
                          TensorTypeB* b,
-                         const char* apply_header,
                          const char* op_string) {
   TensorArgType aType = ReadWrite;
   TensorArgType bType = ReadWrite;
@@ -473,7 +468,7 @@ bool THC_pointwiseApply2(THCState* state,
   kernelPointwiseApply2RTC<typename TensorUtils<TensorTypeA>::DataType, \
                            typename TensorUtils<TensorTypeB>::DataType, \
                            TYPE>                                        \
-      (aInfo, bInfo, apply_header, op_string, (TYPE) totalElements, grid, block, A, B, stream);
+      (aInfo, bInfo, op_string, (TYPE) totalElements, grid, block, A, B, stream);
 
 #define HANDLE_B_CASE(TYPE, A, B)               \
   {                                             \
@@ -540,12 +535,12 @@ bool THC_pointwiseApply2(THCState* state,
       kernelPointwiseApply2RTC<typename TensorUtils<TensorTypeA>::DataType,
                                typename TensorUtils<TensorTypeB>::DataType,
                                unsigned long>
-        (aInfo, bInfo, apply_header, op_string, totalElements, grid, block, -2, -2, stream);
+        (aInfo, bInfo, op_string, totalElements, grid, block, -2, -2, stream);
     } else {
       kernelPointwiseApply2RTC<typename TensorUtils<TensorTypeA>::DataType,
                                typename TensorUtils<TensorTypeB>::DataType,
                                unsigned long>
-        (aInfo, bInfo, apply_header, op_string, (unsigned long) totalElements, grid, block, -1, -1, stream);
+        (aInfo, bInfo, op_string, (unsigned long) totalElements, grid, block, -1, -1, stream);
     }
   }
 #undef HANDLE_CASE
@@ -578,9 +573,8 @@ bool THC_pointwiseApply2(THCState* state,
   bool TH_CONCAT_2(TYPE,_pointwiseApply2)(THCState* state, \
                                     TYPE* a, \
                                     TYPE* b, \
-                                    const char* apply_header, \
                                     const char* op_string) { \
-    return THC_pointwiseApply2<TYPE>(state, a, b, apply_header, op_string); \
+    return THC_pointwiseApply2<TYPE>(state, a, b, op_string); \
   } \
 
 THC_POINTWISE_APPLY2(THCudaTensor)
@@ -595,7 +589,6 @@ bool THC_pointwiseApply3(THCState* state,
                          TensorTypeA* a,
                          TensorTypeB* b,
                          TensorTypeC* c,
-                         const char* apply_header,
                          const char* op_string) {
   TensorArgType aType = ReadWrite;
   TensorArgType bType = ReadWrite;
@@ -663,7 +656,7 @@ bool THC_pointwiseApply3(THCState* state,
                            typename TensorUtils<TensorTypeB>::DataType, \
                            typename TensorUtils<TensorTypeC>::DataType, \
                            TYPE>                                        \
-      (aInfo, bInfo, cInfo, apply_header, op_string, (TYPE) totalElements, grid, block, A, B, C, stream);
+      (aInfo, bInfo, cInfo, op_string, (TYPE) totalElements, grid, block, A, B, C, stream);
 
 #define HANDLE_C_CASE(TYPE, A, B, C)            \
   {                                             \
@@ -759,13 +752,13 @@ bool THC_pointwiseApply3(THCState* state,
                                typename TensorUtils<TensorTypeB>::DataType,
                                typename TensorUtils<TensorTypeC>::DataType,
                                unsigned long>
-        (aInfo, bInfo, cInfo, apply_header, op_string, totalElements, grid, block, -2, -2, -2, stream);
+        (aInfo, bInfo, cInfo, op_string, totalElements, grid, block, -2, -2, -2, stream);
     } else {
       kernelPointwiseApply3RTC<typename TensorUtils<TensorTypeA>::DataType,
                                typename TensorUtils<TensorTypeB>::DataType,
                                typename TensorUtils<TensorTypeC>::DataType,
                                unsigned long>
-        (aInfo, bInfo, cInfo, apply_header, op_string, (unsigned long) totalElements, grid, block, -1, -1, -1, stream);
+        (aInfo, bInfo, cInfo, op_string, (unsigned long) totalElements, grid, block, -1, -1, -1, stream);
     }
   }
 #undef HANDLE_CASE
@@ -810,9 +803,8 @@ bool THC_pointwiseApply3(THCState* state,
                                     TYPE* a, \
                                     TYPE* b, \
                                     TYPE* c, \
-                                    const char* apply_header, \
                                     const char* op_string) { \
-    return THC_pointwiseApply3<TYPE>(state, a, b, c, apply_header, op_string); \
+    return THC_pointwiseApply3<TYPE>(state, a, b, c, op_string); \
   }
 
 THC_POINTWISE_APPLY3(THCudaTensor)

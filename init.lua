@@ -1,6 +1,6 @@
 local ffi = require 'ffi'
 local cutorch = require 'cutorch'
-local C, APPLY_INCLUDE = table.unpack(require 'cutorch-rtc/ffi')
+local C = require 'cutorch-rtc/ffi'
 
 function cutorch.launchPTX(ptx, kernel_name, arguments, gridDim, blockDim)
   assert(torch.type(gridDim) == 'table' and #gridDim > 0)
@@ -50,7 +50,6 @@ for i,ttype in ipairs(types) do
 
      C['TH'..ttype..'_pointwiseApply1'](cutorch.getState(),
                    self:cdata(),
-                   APPLY_INCLUDE,
                    lambda)
      return self
    end
@@ -61,7 +60,6 @@ for i,ttype in ipairs(types) do
      C['TH'..ttype..'_pointwiseApply2'](cutorch.getState(),
                    self:cdata(),
                    b:cdata(),
-                   APPLY_INCLUDE,
                    lambda)
      return self
    end
@@ -73,7 +71,6 @@ for i,ttype in ipairs(types) do
                    self:cdata(),
                    b:cdata(),
                    c:cdata(),
-                   APPLY_INCLUDE,
                    lambda)
      return self
    end
